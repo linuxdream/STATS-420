@@ -1,0 +1,631 @@
+---
+title: "bching3-sim-proj"
+author: "Brandon Ching"
+output: html_document
+---
+
+```{r include=FALSE}
+library(tidyverse);
+```
+
+
+# Simulation Study 1
+```{r}
+# Set seed
+birthday = 19810908;
+set.seed(birthday);
+```
+
+## Introduction
+The purpose of this study is to test the significance of regression against two different models. The form of both models is as follows:
+
+$Y_i = \beta_0 + \beta_1x_{i1} + \beta_2x_{i2} + \beta_3x_{i3} + e_i$
+
+where $e_i \sim N(0, \sigma^2)$
+
+and a "significant" model having:
+
+$\beta_0 = 3$
+
+$\beta_1 = 1$
+
+$\beta_2 = 1$
+
+$\beta_3 = 1$
+
+and a "non-significant" model having:
+
+$\beta_0 = 3$
+
+$\beta_1 = 0$
+
+$\beta_2 = 0$
+
+$\beta_3 = 0$
+
+## Methods
+
+To test the significance of these two models, we must first initialize the necessary $\beta$ variables, counts, and import the provided data
+
+```{r}
+# Load predictors
+predictors = read_csv("study_1.csv");
+
+# Set out betas for both models. s = significant; ns = non-significant.
+beta_0_s = 3;
+beta_1_s = 1;
+beta_2_s = 1;
+beta_3_s = 1;
+
+beta_0_ns = 3;
+beta_1_ns = 0;
+beta_2_ns = 0;
+beta_3_ns = 0;
+
+# General values
+n = nrow(predictors);
+sigmas = c(1, 5, 10);
+p = 3;
+sims = 2500;
+```
+
+Next, we create the necessary tracker data frames that will hold the generated data from the simulations
+
+```{r}
+# Tracker data frames
+f_stat_s = data.frame("sig 1" = rep(0, sims), "sig 5" = rep(0, sims), "sig 10" = rep(0, sims));
+f_stat_ns = data.frame("sig 1" = rep(0, sims), "sig 5" = rep(0, sims), "sig 10" = rep(0, sims));
+p_value_s = data.frame("sig 1" = rep(0, sims), "sig 5" = rep(0, sims), "sig 10" = rep(0, sims));
+p_value_ns = data.frame("sig 1" = rep(0, sims), "sig 5" = rep(0, sims), "sig 10" = rep(0, sims));
+r_2_s = data.frame("sig 1" = rep(0, sims), "sig 5" = rep(0, sims), "sig 10" = rep(0, sims));
+r_2_ns = data.frame("sig 1" = rep(0, sims), "sig 5" = rep(0, sims), "sig 10" = rep(0, sims));
+```
+
+Finally, we can fit and simulate our models. Using nested for loops, we can easily iterate through all sigmas and the requisite number of simulations for each. For each simulation, we create our random error parameter based on the model. Since we need to run sumulations for both models using the same training data and $\sigma$ values, we do this in sequence. After the $y$ values are generated, we fit the model then save the F statistic, p-value, and $R^2$ for each simulation into our tracker data frame.
+
+```{r}
+
+# Generate y's and train
+for(sig in 1:length(sigmas)){
+  for(i in 1:sims){
+    eps = rnorm(n, mean = 0, sd = sigmas[sig]);
+    
+    # Train significant model
+    y = as.vector(beta_0_s + beta_1_s * predictors["x1"] + beta_2_s * predictors["x2"] + beta_3_s * predictors["x3"] + eps)[,1];
+    predictors$y = y;
+    local_model_s = lm(y ~ x1 + x2 + x3, data = predictors);
+    local_model_summary_s = summary(local_model_s);
+    
+    f_stat_s[i,sig] = local_model_summary_s$fstatistic[[1]];
+    r_2_s[i, sig] = local_model_summary_s$r.squared;
+    p_value_s[i, sig] = pf(local_model_summary_s$fstatistic[1], local_model_summary_s$fstatistic[2], local_model_summary_s$fstatistic[3], lower.tail = FALSE)
+    
+    
+    # Train non-significant model
+    y = as.vector(beta_0_ns + beta_1_ns * predictors["x1"] + beta_2_ns * predictors["x2"] + beta_3_ns * predictors["x3"] + eps)[,1];
+    predictors$y = y;
+    local_model_ns = lm(y ~ x1 + x2 + x3, data = predictors);
+    local_model_summary_ns = summary(local_model_ns);
+    
+    f_stat_ns[i, sig] = local_model_summary_ns$fstatistic[[1]];
+    r_2_ns[i, sig] = local_model_summary_ns$r.squared;
+    p_value_ns[i, sig] = pf(local_model_summary_ns$fstatistic[1], local_model_summary_ns$fstatistic[2], local_model_summary_ns$fstatistic[3], lower.tail = FALSE)
+  }
+}
+```
+
+## Results
+### F Statistic Results
+```{r}
+# F statistic sig = 1
+par(mfrow = c(1,2));
+hist(f_stat_s$sig.1,
+     main = "F Stat - S sig = 1",
+     border = "blue",
+     xlab = "F Statistic",
+     prob = TRUE
+     );
+x = f_stat_s$sig.1;
+curve( df(x, df1 = 3, df2 = 2497), col = "darkorange", add = TRUE, lwd = 3);
+
+hist(f_stat_ns$sig.1,
+     main = "F Stat - NS sig = 1",
+     border = "blue",
+     xlab = "F Statistic",
+     prob = TRUE
+     );
+x = f_stat_ns$sig.1;
+curve( df(x, df1 = 3, df2 = 2497), col = "darkorange", add = TRUE, lwd = 3);
+
+# F statistic sig = 5
+par(mfrow = c(1,2));
+hist(f_stat_s$sig.5,
+     main = "F Statistic - S sigma = 5",
+     border = "red",
+     xlab = "F Statistic",
+     prob = TRUE
+     );
+x = f_stat_s$sig.5;
+curve( df(x, df1 = 3, df2 = 2497), col = "darkorange", add = TRUE, lwd = 3);
+
+hist(f_stat_ns$sig.5,
+     main = "F Statistic - NS sigma = 5",
+     border = "red",
+     xlab = "F Statistic",
+     prob = TRUE
+     );
+x = f_stat_ns$sig.5;
+curve( df(x, df1 = 3, df2 = 2497), col = "darkorange", add = TRUE, lwd = 3);
+
+
+# F statistic sig = 10
+par(mfrow = c(1,2));
+hist(f_stat_s$sig.10,
+     main = "F Statistic - S sigma = 10",
+     border = "green",
+     xlab = "F Statistic",
+     prob = TRUE
+     );
+x = f_stat_ns$sig.10;
+curve( df(x, df1 = 3, df2 = 2497), col = "darkorange", add = TRUE, lwd = 3);
+
+hist(f_stat_ns$sig.10,
+     main = "F Statistic - NS sigma = 10",
+     border = "green",
+     xlab = "F Statistic",
+     prob = TRUE
+     );
+x = f_stat_ns$sig.10;
+curve( df(x, df1 = 3, df2 = 2497), col = "darkorange", add = TRUE, lwd = 3);
+```
+
+### p-value Results
+
+```{r}
+# p-value 1
+par(mfrow = c(1,2));
+hist(p_value_s$sig.1,
+     main = "p-value - S sigma = 1",
+     border = "blue",
+     xlab = "p-value",
+     prob = TRUE
+     );
+hist(p_value_ns$sig.1,
+     main = "p-value - NS sigma = 1",
+     border = "blue",
+     xlab = "p-value",
+     prob = TRUE
+     );
+
+# p-value 5
+par(mfrow = c(1,2));
+hist(p_value_s$sig.5,
+     main = "p-value - S sigma = 5",
+     border = "red",
+     xlab = "p-value",
+     prob = TRUE
+     );
+hist(p_value_ns$sig.5,
+     main = "p-value - NS sigma = 5",
+     border = "red",
+     xlab = "p-value",
+     prob = TRUE
+     );
+
+# p-valule 10
+par(mfrow = c(1,2));
+hist(p_value_s$sig.10,
+     main = "p-value - S sigma = 10",
+     border = "green",
+     xlab = "p-value",
+     prob = TRUE
+     );
+hist(p_value_ns$sig.10,
+     main = "p-value - NS sigma = 10",
+     border = "green",
+     xlab = "p-value",
+     prob = TRUE
+     );
+```
+
+### R^2 Results
+
+```{r}
+# r2 1
+par(mfrow = c(1,2));
+hist(r_2_s$sig.1,
+     main = "R^2 - S sigma = 1",
+     border = "blue",
+     xlab = "R^2",
+     prob = TRUE
+     );
+
+hist(r_2_ns$sig.1,
+     main = "R^2 - NS sigma = 1",
+     border = "blue",
+     xlab = "R^2",
+     prob = TRUE
+     );
+x = r_2_ns$sig.1;
+
+# r2 5
+par(mfrow = c(1,2));
+hist(r_2_s$sig.5,
+     main = "R^2 - S sigma = 5",
+     border = "red",
+     xlab = "R^2",
+     prob = TRUE
+     );
+hist(r_2_ns$sig.5,
+     main = "R^2 - NS sigma = 5",
+     border = "red",
+     xlab = "R^2",
+     prob = TRUE
+     );
+
+# r2 10
+par(mfrow = c(1,2));
+hist(r_2_s$sig.10,
+     main = "R^2 - S sigma = 10",
+     border = "green",
+     xlab = "R^2",
+     prob = TRUE
+     );
+hist(r_2_ns$sig.10,
+     main = "R^2 - NS sigma = 10",
+     border = "green",
+     xlab = "R^2",
+     prob = TRUE
+     );
+```
+
+
+## Discussion
+### F Statistic
+We would expect that F statistic results would align with a standard F Distribution. In the above graphs, I have plotted the emperical simulation F statistic results against the curve of a true F Distribution. As we can see, the "significant" models do not exactly align with the distribution curve. This is especially true for values at $\sigma = 1$. This means that the significant model is indeed significant if its distribution does not match the curve for its distribution type since $H_0$ = distributions are the same. As $\sigma$ increases the distribution seems be become close inline with the true F Distribution curve.
+
+### p-value
+The p-value graphs for the non-significant model at all $\sigma$ values appear to be uniform distributions. The significant models at all $\sigma$ levels do not fit this distribution through as $\sigma$ increases, it does appear to get closer. I did not add a uniform line to these graphs as it seemed pretty obvious.
+
+### R^2
+I could not successfully determine the type of distribution for $R^2$ results. The non-significant model at all $\sigma$ values
+appears to be similar to a F Distribution but attempts to plot this curve as I did with the F statistic values was unsuccessful. I also tried to plot Chi Square and normal curves and these did not appear correct either. 
+
+Looking at the significant model, lower values of $\sigma$ average to higher $R^2$ values which would make sense since $\sigma$ influences the noise/error in the generation of y values. This relationship is inverse in that the lower the $\sigma$ the higher explanatory power of the model. In terms of plots for the significant model, at lower $\sigma$ values, the distribution appears normal but as $\sigma$ increases, the mean moves closer to 0 and changes the shape of the curve to align closer to the non-significant model.
+
+# Simulation Study 2
+```{r}
+# Set seed
+birthday = 19810908;
+set.seed(birthday);
+```
+
+## Introduction
+In this study, we are attempting to use RMSE to determine the model that fits "best."
+
+Model:
+$Y_i = \beta_0 + \beta_1x_{i1} + \beta_2x_{i2} + \beta_3x_{i3} + \beta_3x_{i3} + \beta_4x_{i4} + \beta_5x_{i5} + \beta_6x_{i6} + e_i$
+
+where 
+
+$e_i \sim N(0, \sigma^2)$
+
+and
+
+$\beta_0 = 0$
+
+$\beta_1 = 5$
+
+$\beta_2 = -4$
+
+$\beta_3 = 1.6$
+
+$\beta_4 = -1.1$
+
+$\beta_5 = 0.7$
+
+$\beta_6 = 0.3$
+
+
+## Methods
+```{r}
+library(knitr);
+library(kableExtra);
+
+# Import data
+predictors = read_csv("study_2.csv");
+
+# Helper
+calc_rmse = function(observed, predicted) {
+  sqrt(mean((observed - predicted)^2));
+}
+
+# Set general vars
+beta_0 = 0;
+beta_1 = 5;
+beta_2 = -4;
+beta_3 = 1.6;
+beta_4 = -1.1;
+beta_5 = 0.7;
+beta_6 = 0.3;
+
+n = 500;
+sigmas = c(1, 2, 4);
+sims = 1000
+
+# Prepopulate out results containers
+train_results_1 = data.frame("model1" = rep(0, sims), "model2" = rep(0, sims), "model3" = rep(0, sims), "model4" = rep(0, sims), "model5" = rep(0, sims), "model6" = rep(0, sims), "model7" = rep(0, sims), "model8" = rep(0, sims), "model9" = rep(0, sims));
+train_results_2 = data.frame("model1" = rep(0, sims), "model2" = rep(0, sims), "model3" = rep(0, sims), "model4" = rep(0, sims), "model5" = rep(0, sims), "model6" = rep(0, sims), "model7" = rep(0, sims), "model8" = rep(0, sims), "model9" = rep(0, sims));
+train_results_4 = data.frame("model1" = rep(0, sims), "model2" = rep(0, sims), "model3" = rep(0, sims), "model4" = rep(0, sims), "model5" = rep(0, sims), "model6" = rep(0, sims), "model7" = rep(0, sims), "model8" = rep(0, sims), "model9" = rep(0, sims));
+test_results_1 = data.frame("model1" = rep(0, sims), "model2" = rep(0, sims), "model3" = rep(0, sims), "model4" = rep(0, sims), "model5" = rep(0, sims), "model6" = rep(0, sims), "model7" = rep(0, sims), "model8" = rep(0, sims), "model9" = rep(0, sims));
+test_results_2 = data.frame("model1" = rep(0, sims), "model2" = rep(0, sims), "model3" = rep(0, sims), "model4" = rep(0, sims), "model5" = rep(0, sims), "model6" = rep(0, sims), "model7" = rep(0, sims), "model8" = rep(0, sims), "model9" = rep(0, sims));
+test_results_4 = data.frame("model1" = rep(0, sims), "model2" = rep(0, sims), "model3" = rep(0, sims), "model4" = rep(0, sims), "model5" = rep(0, sims), "model6" = rep(0, sims), "model7" = rep(0, sims), "model8" = rep(0, sims), "model9" = rep(0, sims));
+
+
+# Cycle through sims
+for(sig in 1:length(sigmas)) {
+  for(i in 1:sims) {
+    #Generate y's
+    eps = rnorm(n, mean = 0, sd = sigmas[sig]);
+    
+    y = beta_0 + beta_1 * predictors["x1"] + beta_2 * predictors["x2"] + beta_3 * predictors["x3"] + beta_4 * predictors["x4"] + beta_5 * predictors["x5"] + beta_6 * predictors["x6"] + eps;
+    predictors$y = as.vector(y)[,1];
+    
+    # Split train/test
+    indexes = sample(250);
+    train = predictors[indexes,];
+    test = predictors[-indexes,];
+    
+    # Fit models
+    # Would love to have looped this but cat/eval/interpolation in r?
+    train_model_1 = lm(y ~ x1, data = train);
+    train_model_2 = lm(y ~ x1 + x2, data = train);
+    train_model_3 = lm(y ~ x1 + x2 + x3, data = train);
+    train_model_4 = lm(y ~ x1 + x2 + x3 + x4, data = train);
+    train_model_5 = lm(y ~ x1 + x2 + x3 + x4 + x5, data = train);
+    train_model_6 = lm(y ~ x1 + x2 + x3 + x4 + x5 + x6, data = train);
+    train_model_7 = lm(y ~ x1 + x2 + x3 + x4 + x5 + x6 + x7, data = train);
+    train_model_8 = lm(y ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8, data = train);
+    train_model_9 = lm(y ~ x1 + x2 + x3 + x4 + x5 + x6 + x7 + x8 + x9, data = train);
+    
+    # I'm not comfortable enough with multidimensional data structures so...
+    # Trust me, I know this is terrible.
+    if(sig == 1){
+      train_results_1[i, "model1"] = calc_rmse(train$y, predict.lm(train_model_1, train));
+      train_results_1[i, "model2"] = calc_rmse(train$y, predict.lm(train_model_2, train));
+      train_results_1[i, "model3"] = calc_rmse(train$y, predict.lm(train_model_3, train));
+      train_results_1[i, "model4"] = calc_rmse(train$y, predict.lm(train_model_4, train));
+      train_results_1[i, "model5"] = calc_rmse(train$y, predict.lm(train_model_5, train));
+      train_results_1[i, "model6"] = calc_rmse(train$y, predict.lm(train_model_6, train));
+      train_results_1[i, "model7"] = calc_rmse(train$y, predict.lm(train_model_7, train));
+      train_results_1[i, "model8"] = calc_rmse(train$y, predict.lm(train_model_8, train));
+      train_results_1[i, "model9"] = calc_rmse(train$y, predict.lm(train_model_9, train));
+      
+      test_results_1[i, "model1"] = calc_rmse(test$y, predict.lm(train_model_1, test));
+      test_results_1[i, "model2"] = calc_rmse(test$y, predict.lm(train_model_2, test));
+      test_results_1[i, "model3"] = calc_rmse(test$y, predict.lm(train_model_3, test));
+      test_results_1[i, "model4"] = calc_rmse(test$y, predict.lm(train_model_4, test));
+      test_results_1[i, "model5"] = calc_rmse(test$y, predict.lm(train_model_5, test));
+      test_results_1[i, "model6"] = calc_rmse(test$y, predict.lm(train_model_6, test));
+      test_results_1[i, "model7"] = calc_rmse(test$y, predict.lm(train_model_7, test));
+      test_results_1[i, "model8"] = calc_rmse(test$y, predict.lm(train_model_8, test));
+      test_results_1[i, "model9"] = calc_rmse(test$y, predict.lm(train_model_9, test));
+    } else if (sig == 2){
+      train_results_2[i, "model1"] = calc_rmse(train$y, predict.lm(train_model_1, train));
+      train_results_2[i, "model2"] = calc_rmse(train$y, predict.lm(train_model_2, train));
+      train_results_2[i, "model3"] = calc_rmse(train$y, predict.lm(train_model_3, train));
+      train_results_2[i, "model4"] = calc_rmse(train$y, predict.lm(train_model_4, train));
+      train_results_2[i, "model5"] = calc_rmse(train$y, predict.lm(train_model_5, train));
+      train_results_2[i, "model6"] = calc_rmse(train$y, predict.lm(train_model_6, train));
+      train_results_2[i, "model7"] = calc_rmse(train$y, predict.lm(train_model_7, train));
+      train_results_2[i, "model8"] = calc_rmse(train$y, predict.lm(train_model_8, train));
+      train_results_2[i, "model9"] = calc_rmse(train$y, predict.lm(train_model_9, train));
+      
+      test_results_2[i, "model1"] = calc_rmse(test$y, predict.lm(train_model_1, test));
+      test_results_2[i, "model2"] = calc_rmse(test$y, predict.lm(train_model_2, test));
+      test_results_2[i, "model3"] = calc_rmse(test$y, predict.lm(train_model_3, test));
+      test_results_2[i, "model4"] = calc_rmse(test$y, predict.lm(train_model_4, test));
+      test_results_2[i, "model5"] = calc_rmse(test$y, predict.lm(train_model_5, test));
+      test_results_2[i, "model6"] = calc_rmse(test$y, predict.lm(train_model_6, test));
+      test_results_2[i, "model7"] = calc_rmse(test$y, predict.lm(train_model_7, test));
+      test_results_2[i, "model8"] = calc_rmse(test$y, predict.lm(train_model_8, test));
+      test_results_2[i, "model9"] = calc_rmse(test$y, predict.lm(train_model_9, test));
+    } else if (sig == 3) {
+      train_results_4[i, "model1"] = calc_rmse(train$y, predict.lm(train_model_1, train));
+      train_results_4[i, "model2"] = calc_rmse(train$y, predict.lm(train_model_2, train));
+      train_results_4[i, "model3"] = calc_rmse(train$y, predict.lm(train_model_3, train));
+      train_results_4[i, "model4"] = calc_rmse(train$y, predict.lm(train_model_4, train));
+      train_results_4[i, "model5"] = calc_rmse(train$y, predict.lm(train_model_5, train));
+      train_results_4[i, "model6"] = calc_rmse(train$y, predict.lm(train_model_6, train));
+      train_results_4[i, "model7"] = calc_rmse(train$y, predict.lm(train_model_7, train));
+      train_results_4[i, "model8"] = calc_rmse(train$y, predict.lm(train_model_8, train));
+      train_results_4[i, "model9"] = calc_rmse(train$y, predict.lm(train_model_9, train));
+      
+      test_results_4[i, "model1"] = calc_rmse(test$y, predict.lm(train_model_1, test));
+      test_results_4[i, "model2"] = calc_rmse(test$y, predict.lm(train_model_2, test));
+      test_results_4[i, "model3"] = calc_rmse(test$y, predict.lm(train_model_3, test));
+      test_results_4[i, "model4"] = calc_rmse(test$y, predict.lm(train_model_4, test));
+      test_results_4[i, "model5"] = calc_rmse(test$y, predict.lm(train_model_5, test));
+      test_results_4[i, "model6"] = calc_rmse(test$y, predict.lm(train_model_6, test));
+      test_results_4[i, "model7"] = calc_rmse(test$y, predict.lm(train_model_7, test));
+      test_results_4[i, "model8"] = calc_rmse(test$y, predict.lm(train_model_8, test));
+      test_results_4[i, "model9"] = calc_rmse(test$y, predict.lm(train_model_9, test));
+    }
+  }
+}
+```
+
+
+## Results
+As we can see from the following charts of best model selection, model6 appears to consistently the be model with the lowest RMSE score.
+
+```{r}
+# Plots for model wins
+barplot(table(colnames(test_results_1)[apply(test_results_1,1,which.min)]),
+  xlab = "Models",
+  ylab = "Frequency",
+  main = "Frequency of lowest RMSE - Sigma 1",
+  col = rainbow(9)
+  );
+
+barplot(table(colnames(test_results_2)[apply(test_results_2,1,which.min)]),
+  xlab = "Models",
+  ylab = "Frequency",
+  main = "Frequency of lowest RMSE - Sigma 2",
+  col = rainbow(9)
+  );
+
+barplot(table(colnames(test_results_4)[apply(test_results_4,1,which.min)]),
+  xlab = "Models",
+  ylab = "Frequency",
+  main = "Frequency of lowest RMSE - Sigma 4",
+  col = rainbow(9)
+  );
+```
+
+However, when looking at the mean RMSE values for all simulations, we can see that model6 is not always the lowest.
+
+```{r}
+# Get the model RMSE means
+means_train_1 = colMeans(train_results_1);
+means_test_1 = colMeans(test_results_1);
+means_train_2 = colMeans(train_results_2);
+means_test_2 = colMeans(test_results_2);
+means_train_4 = colMeans(train_results_4);
+means_test_4 = colMeans(test_results_4);
+
+# Display in a nice table
+rmse_data = data.frame(
+  "Train sigma 1" = means_train_1,
+  "Test sigma 1" = means_test_1,
+  "Train sigma 2" = means_train_2,
+  "Test sigma 2" = means_test_2,
+  "Train sigma 4" = means_train_4,
+  "Test sigma 4" = means_test_4
+);
+
+kable(rmse_data, row.names = TRUE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+## Discussion
+It appears that when checked at each simulation against other models, model6 seems to consistently have the lowest RMSE. On average, it appears that model6 has the lowest RMSE and thus it does appear to select the correct model. The error estimate appears to have an equalizing effect on the model selection. As the error value increases in range, more and more models have the chance of having the lowest RMSE and thus the possibility of, "winning" increases for other models.
+
+# Simulation Study 3
+```{r}
+# Set seed
+birthday = 19810908;
+set.seed(birthday);
+```
+
+## Introduction
+In this study, we will be assessing the  power of significance of regression for simple linear regression such that:
+
+$H_0 : \beta_1 = 0$ vs $H_1: \beta_1 \neq 0$
+
+Here we defining *power* as the probability of rejecting the $H_0$ is not true. 
+
+To do this, we will be using the model:
+
+$Y_i = \beta_0 + \beta_1x_i + e_i$
+
+where
+
+$e_i \sim N(0, \sigma^2)$.
+
+The significance level will be constant at $\alpha = 0.05$
+
+## Methods
+```{r}
+# General vars
+beta_0 = 0;
+beta_1s = seq(-2, 2, by=0.1);
+sigmas = c(1, 2, 4);
+ns = c(10, 20, 30);
+a = 0.05;
+sims = 1000;
+
+empty_rows = length(sigmas) * length(ns) * length(beta_1s);
+
+# Tracking var
+tracker = data.frame("sigma" = rep(0, empty_rows), "n" = rep(0, empty_rows), "beta" = rep(0, empty_rows), "power" = rep(0, empty_rows));
+row_num = 1;
+
+# Loop-d-loop
+for(sig_i in 1:length(sigmas)){
+  for(n_i in 1:length(ns)){
+    # Create x values
+    x = seq(0, 5, length = ns[n_i]);
+    
+    for(beta_i in 1:length(beta_1s)){
+      reject_count = 0;
+      
+      #n_i = 1;
+      #beta_i = 1;
+      #sig_i = 1;
+      #x = seq(0, 5, length = ns[n_i]);
+      
+      for(i in 1:sims){
+        # Set eps
+        eps = rnorm(ns[n_i], mean = 0, sd = sigmas[sig_i]);
+        
+        # Determine our y values
+        y = beta_0 + beta_1s[beta_i] * x + eps;
+      
+        # fit the model
+        local_model = lm(y ~ x, data = data.frame("y" = y, "x" = x));
+        
+        if(summary(local_model)$coefficients[2,"Pr(>|t|)"] < a){
+          reject_count = reject_count + 1;
+        }
+      }
+      
+      # Store results
+      tracker[row_num, 1] = sigmas[sig_i];
+      tracker[row_num, 2] = ns[n_i];
+      tracker[row_num, 3] = beta_1s[beta_i]
+      tracker[row_num, 4] = reject_count / sims;
+      
+      row_num = row_num + 1;
+    }
+  }
+}
+```
+
+## Results
+```{r}
+tracker_sigmas = tracker %>%
+  group_by(sigma);
+
+for(s in 1:length(sigmas)) {
+  local_sig = tracker_sigmas %>%
+    filter(sigma == sigmas[s])
+  sig10 = local_sig %>% filter(n == 10);
+  sig20 = local_sig %>% filter(n == 20);
+  sig30 = local_sig %>% filter(n == 30);
+  
+  plot(local_sig$beta, local_sig$power, 
+       type = "n",
+       main = paste("Power by Beta - sigma", sigmas[s]),
+       ylab = "Power",
+       xlab = "Beta_1"
+       );
+  lines(sig10$beta, sig10$power, col = "red");
+  lines(sig20$beta, sig20$power, col = "green");
+  lines(sig30$beta, sig30$power, col = "blue");
+  
+  legend(
+    "top", 
+    legend = c("n = 10", "n = 20", "n = 30"), 
+    col = c("red", "green", "blue"),
+    lty = 1,
+    cex = 0.8
+    );
+}
+
+```
+
+## Discussion
+From the above plots, we can see that as $\sigma$ increases power decreases for values of $\beta_1$ further away from 0. Likewise, as n decreases, so does power, sugesting that larger values of n provide the model with higher power values. $\beta_1$ values close to zero have the least power values as we would expect. Combining all that we have shown here, the highest values of power can be obtained with small $\sigma$ values, large n values, and $\beta_1$ values that are farther away from 0.
+
+I also ran the power tests with 2000 simulations and there was very little difference in the graphs displayed. The lines at $\sigma > 1$ where a bit smoother but that's about it. Thus, it seems like 1000 simulations is sufficient.

@@ -1,0 +1,426 @@
+---
+title: "Week 2 - Homework"
+author: "Brandon Ching (bching3)"
+date: '2018-05-28'
+output:
+  html_document: 
+    toc: yes
+  pdf_document: default
+urlcolor: cyan
+---
+
+# Directions
+
+- Be sure to remove this section if you use this `.Rmd` file as a template.
+- You may leave the questions in your final document.
+
+***
+
+## Exercise 1 (Using `lm`)
+
+For this exercise we will use the `cats` dataset from the `MASS` package. You should use `?cats` to learn about the background of this dataset.
+
+```{r}
+library("MASS");
+```
+
+**(a)** Suppose we would like to understand the size of a cat's heart based on the body weight of a cat. Fit a simple linear model in `R` that accomplishes this task. Store the results in a variable called `cat_model`. Output the result of calling `summary()` on `cat_model`.
+
+```{r}
+cat_model = lm(Hwt ~ Bwt, data = cats);
+summary(cat_model);
+```
+
+**(b)** Output only the estimated regression coefficients. Interpret $\hat{\beta_0}$ and $\beta_1$ in the *context of the problem*. Be aware that only one of those is an estimate.
+
+```{r}
+coef(cat_model);
+```
+- **$\hat{\beta_0}$ is the estimated heart weight when the cat's body weight is 0 (y intercept). $\beta_1$ is the change in heart weight with one kg increase in a cat's body weight.**
+
+**(c)** Use your model to predict the heart weight of a cat that weights **2.7** kg. Do you feel confident in this prediction? Briefly explain.
+```{r}
+predict(cat_model, newdata = data.frame(Bwt = 2.7))
+```
+- **I do believe that a cat with a body weight of 2.7 would have a heart weight of 10.54kg. Looking at the plot, that value appears to be within the expected range.**
+
+
+**(d)** Use your model to predict the heart weight of a cat that weights **4.4** kg. Do you feel confident in this prediction? Briefly explain.
+```{r}
+predict(cat_model, newdata = data.frame(Bwt = 4.4))
+```
+- **A cat with a weight of 4.4kg would result in a heart weight of 17.39. This feels a little low considering the other actual values towards the end of the weight range. Additionally, this weight is not within the range of observed values so I am less confident in it.**
+
+**(e)** Create a scatterplot of the data and add the fitted regression line. Make sure your plot is well labeled and is somewhat visually appealing.
+```{r}
+plot(Hwt ~ Bwt, data = cats,
+     xlab = "Cat Weight in kg",
+     ylab = "Cat Heart Weight in kg",
+     main = "Cats body vs heart weight",
+     pch  = 20,
+     cex  = 2,
+     col  = "red"
+     );
+abline(cat_model, lwd = 3, col = "blue");
+```
+
+**(f)** Report the value of $R^2$ for the model. Do so directly. Do not simply copy and paste the value from the full output in the console after running `summary()` in part **(a)**.
+```{r}
+y_hat = coef(cat_model)["(Intercept)"] + coef(cat_model)["Bwt"]*cats$Bwt
+SST   = sum((cats$Hwt - mean(cats$Hwt)) ^ 2)
+SSReg = sum((y_hat - mean(cats$Hwt)) ^ 2)
+R2 = SSReg/SST
+R2
+```
+- **R2 is 0.6466**
+
+
+***
+
+## Exercise 2 (Writing Functions)
+
+This exercise is a continuation of Exercise 1.
+
+**(a)** Write a function called `get_sd_est` that calculates an estimate of $\sigma$ in one of two ways depending on input to the function. The function should take three arguments as input:
+
+- `fitted_vals` - A vector of fitted values from a model
+- `actual_vals` - A vector of the true values of the response
+- `mle` - A logical (`TRUE` / `FALSE`) variable which defaults to `FALSE`
+
+The function should return a single value:
+
+- $s_e$ if `mle` is set to `FALSE`.
+- $\hat{\sigma}$ if `mle` is set to `TRUE`.
+
+```{r}
+get_sd_est = function(fitted_vals, actual_vals, mle = FALSE) {
+  e     = actual_vals - fitted_vals;
+  n     = length(e);
+  dfcalc = 2;
+  
+  if(mle){
+    dfcalc = 1;  
+  }
+  
+  return  = sum(e^2) / (n - dfcalc)
+  sqrt(return);
+}
+```
+
+**(b)** Run the function `get_sd_est` on the residuals from the model in Exercise 1, with `mle` set to `FALSE`. Explain the resulting estimate in the context of the model.
+```{r}
+get_sd_est(y_hat, cats$Hwt);
+```
+- **The residual standard error in this case is 1.452 which means that the estimated mean heart weights are typically off by 1.452kg.**
+
+**(c)** Run the function `get_sd_est` on the residuals from the model in Exercise 1, with `mle` set to `TRUE`. Explain the resulting estimate in the context of the model. Note that we are trying to estimate the same parameter as in part **(b)**.
+```{r}
+get_sd_est(y_hat, cats$Hwt, TRUE);
+```
+- **The **
+
+**(d)** To check your work, output `summary(cat_model)$sigma`. It should match at least one of **(b)** or **(c)**.
+```{r}
+get_sd_est(y_hat, cats$Hwt) == summary(cat_model)$sigma
+```
+
+***
+
+## Exercise 3 (Simulating SLR)
+
+Consider the model
+
+\[
+Y_i = 5 + -3 x_i + \epsilon_i
+\]
+
+with 
+
+\[
+\epsilon_i \sim N(\mu = 0, \sigma^2 = 10.24)
+\]
+
+where $\beta_0 = 5$ and $\beta_1 = -3$.
+
+This exercise relies heavily on generating random observations. To make this reproducible we will set a seed for the randomization. Alter the following code to make `birthday` store your birthday in the format: `yyyymmdd`. For example, [William Gosset](https://en.wikipedia.org/wiki/William_Sealy_Gosset), better known as *Student*, was born on June 13, 1876, so he would use:
+
+```{r}
+birthday = 19810908
+set.seed(birthday)
+```
+
+**(a)** Use `R` to simulate `n = 25` observations from the above model. For the remainder of this exercise, use the following "known" values of $x$.
+
+```{r}
+x = runif(n = 25, 0, 10)
+```
+
+You may use [the `sim_slr ` function provided in the text](http://daviddalpiaz.github.io/appliedstats/simple-linear-regression.html#simulating-slr). Store the data frame this function returns in a variable of your choice. Note that this function calls $y$ `response` and $x$ `predictor`.
+```{r}
+sim_slr = function(x, beta_0 = 10, beta_1 = 5, sigma = 1) {
+  n = length(x)
+  epsilon = rnorm(n, mean = 0, sd = sigma)
+  y = beta_0 + beta_1 * x + epsilon
+  data.frame(predictor = x, response = y)
+}
+
+sim_data = sim_slr(x, 5, -3, sqrt(10.24));
+```
+
+**(b)** Fit a model to your simulated data. Report the estimated coefficients. Are they close to what you would expect? Briefly explain.
+```{r}
+sim_model = lm(response ~ predictor, data = sim_data);
+coef(sim_model);
+```
+- **The coefficients are close to what would be expected. The model $\beta_0$ is 5 while the lm intercept is 4.96 while the model $\beta_1$ was -3 while the lm was -2.95. Both simluated data linear models are very close to their oringinal model parameters.**
+
+
+**(c)** Plot the data you simulated in part **(a)**. Add the regression line from part **(b)** as well as the line for the true model. Hint: Keep all plotting commands in the same chunk.
+```{r}
+plot(response ~ predictor, data = sim_data,
+     xlab = "Predictor",
+     ylab = "Reponse",
+     main = "Random Predictor vs Response",
+     pch  = 20,
+     cex  = 2,
+     col  = "red"
+     );
+abline(sim_model, lwd = 3, col = "blue");
+```
+
+**(d)** Use `R` to repeat the process of simulating `n = 25` observations from the above model $1500$ times. Each time fit a SLR model to the data and store the value of $\hat{\beta_1}$ in a variable called `beta_hat_1`. Some hints:
+
+- Consider a `for` loop.
+- Create `beta_hat_1` before writing the `for` loop. Make it a vector of length $1500$ where each element is `0`.
+- Inside the body of the `for` loop, simulate new $y$ data each time. Use a variable to temporarily store this data together with the known $x$ data as a data frame.
+- After simulating the data, use `lm()` to fit a regression. Use a variable to temporarily store this output.
+- Use the `coef()` function and `[]` to extract the correct estimated coefficient.
+- Use `beta_hat_1[i]` to store in elements of `beta_hat_1`.
+- See the notes on [Distribution of a Sample Mean](http://daviddalpiaz.github.io/appliedstats/introduction-to-r.html#distribution-of-a-sample-mean) for some inspiration.
+
+You can do this differently if you like. Use of these hints is not required.
+```{r}
+beta_hat_1 = c(rep(0, 1500));
+
+for(i in 1:1500) {
+  x = runif(n = 25, 0, 10);
+  sim_data = sim_slr(x, 5, -3, sqrt(10.24));
+  sim_model = lm(response ~ predictor, data = sim_data);
+  beta_hat_1[i] = coef(sim_model)["predictor"];
+}
+```
+
+
+**(e)** Report the mean and standard deviation of `beta_hat_1`. Do either of these look familiar?
+```{r}
+mean_sd = c("mean" = mean(beta_hat_1), "sigma" = sd(beta_hat_1));
+mean_sd
+```
+- **The mean is very cose to 0 which was the epsilon in the model while the sigma value 2.96 is very close to the standard deviation of the original model of 3.2**
+
+
+**(f)** Plot a histogram of `beta_hat_1`. Comment on the shape of this histogram.
+```{r}
+hist(beta_hat_1,
+     xlab = "Beta Hat 1 Values",
+     main = "Beta Hat 1",
+     col  = "red"
+     );
+```
+
+- **The shape looks to be a normal distribution centered around a mean of 0.**
+
+***
+
+## Exercise 4 (Be a Skeptic)
+
+Consider the model
+
+\[
+Y_i = 3 + 0 \cdot x_i + \epsilon_i
+\]
+
+with
+
+\[
+\epsilon_i \sim N(\mu = 0, \sigma^2 = 4)
+\]
+
+where $\beta_0 = 3$ and $\beta_1 = 0$.
+
+Before answering the following parts, set a seed value equal to **your** birthday, as was done in the previous exercise.
+
+```{r}
+birthday = 19810908
+set.seed(birthday)
+```
+
+**(a)** Use `R` to repeat the process of simulating `n = 75` observations from the above model $2500$ times. For the remainder of this exercise, use the following "known" values of $x$.
+```{r}
+x = runif(n = 75, 0, 10);
+```
+
+Each time fit a SLR model to the data and store the value of $\hat{\beta_1}$ in a variable called `beta_hat_1`. You may use [the `sim_slr ` function provided in the text](http://daviddalpiaz.github.io/appliedstats/simple-linear-regression.html#simulating-slr). Hint: Yes $\beta_1 = 0$.
+
+```{r}
+for (i in 1:2500) {
+  x_sim = runif(n = 75, 0, 10);
+  sim_data = sim_slr(x_sim, 3, 0, sqrt(4));
+  sim_model = lm(response ~ predictor, data = sim_data);
+  beta_hat_1[i] = coef(sim_model)["predictor"];
+}
+```
+
+**(b)** Plot a histogram of `beta_hat_1`. Comment on the shape of this histogram.
+```{r}
+hist(beta_hat_1,
+     xlab = "Beta Hat 1 Values",
+     main = "Beta Hat 1",
+     col  = "blue"
+     );
+```
+
+- **The shape of the curve looks to be normal distribution centered around a mean of 0.**
+
+
+**(c)** Import the data in [`skeptic.csv`](skeptic.csv) and fit a SLR model. The variable names in `skeptic.csv` follow the same convention as those returned by `sim_slr()`. Extract the fitted coefficient for $\beta_1$.
+```{r}
+library("readr");
+skeptic = read_csv("skeptic.csv");
+skeptic_model = lm(response ~ predictor, data = skeptic);
+coef(skeptic_model);
+```
+
+**(d)** Re-plot the histogram from **(b)**. Now add a vertical red line at the value of $\hat{\beta_1}$ in part **(c)**. To do so, you'll need to use `abline(v = c, col = "red")` where `c` is your value.
+```{r}
+hist(beta_hat_1,
+     xlab = "Beta Hat 1 Values",
+     main = "Beta Hat 1",
+     col  = "blue"
+     );
+abline(v = coef(skeptic_model)["predictor"], col = "red");
+```
+
+**(e)** Your value of $\hat{\beta_1}$ in **(c)** should be negative. What proportion of the `beta_hat_1` values is smaller than your $\hat{\beta_1}$? Return this proportion, as well as this proportion multiplied by `2`.
+```{r}
+prop_less = length(beta_hat_1[beta_hat_1 < coef(skeptic_model)["predictor"]]) / length(beta_hat_1);
+prop_less
+
+prop_less * 2
+```
+- **0.002 of beat_hat_1 values are smaller than $\hat{\beta_1}$ while 0.004 is the proportion multiplied by 2.**
+
+
+**(f)** Based on your histogram and part **(e)**, do you think the [`skeptic.csv`](skeptic.csv) data could have been generated by the model given above? Briefly explain.
+
+- **No I do not belive so. The $\hat{\beta_1}$ values I generated from the lm are not anywhere near the observed $\beta_1$ averaged of the skeptic dataset.**
+
+***
+
+## Exercise 5 (Comparing Models)
+
+For this exercise we will use the `Ozone` dataset from the `mlbench` package. You should use `?Ozone` to learn about the background of this dataset. You may need to install the `mlbench` package. If you do so, do not include code to install the package in your `R` Markdown document.
+
+For simplicity, we will perform some data cleaning before proceeding.
+
+```{r}
+data(Ozone, package = "mlbench")
+Ozone = Ozone[, c(4, 6, 7, 8)]
+colnames(Ozone) = c("ozone", "wind", "humidity", "temp")
+Ozone = Ozone[complete.cases(Ozone), ]
+```
+
+We have:
+
+- Loaded the data from the package
+- Subset the data to relevant variables
+    - This is not really necessary (or perhaps a good idea) but it makes the next step easier
+- Given variables useful names
+- Removed any observation with missing values
+    - This should be given much more thought in practice
+
+For this exercise we will define the "Root Mean Square Error" of a model as
+
+\[
+\text{RMSE} = \sqrt{\frac{1}{n} \sum_{i = 1}^{n}(y_i - \hat{y}_i)^2}.
+\]
+
+**(a)** Fit three SLR models, each with "ozone" as the response. For the predictor, use "wind speed," "humidity percentage," and "temperature" respectively. For each, calculate $\text{RMSE}$ and $R^2$. Arrange the results in a markdown table, with a row for each model. Suggestion: Create a data frame that stores the results, then investigate the `kable()` function from the `knitr` package.
+```{r}
+wind_model = lm(ozone ~ wind, data = Ozone);
+humidity_model = lm(ozone ~ humidity, data = Ozone);
+temp_model = lm(ozone ~ temp, data = Ozone);
+
+y_hat_wind = coef(wind_model)["(Intercept)"] + coef(wind_model)["wind"] * Ozone$wind;
+y_hat_humidity = coef(humidity_model)["(Intercept)"] + coef(humidity_model)["humidity"] * Ozone$humidity;
+y_hat_temp = coef(temp_model)["(Intercept)"] + coef(temp_model)["temp"] * Ozone$temp;
+
+SST = sum((Ozone$ozone - mean(Ozone$ozone))^2);
+
+SSReg_wind = sum((y_hat_wind - mean(Ozone$ozone))^2);
+SSReg_humidity = sum((y_hat_humidity - mean(Ozone$ozone))^2);
+SSReg_temp = sum((y_hat_temp - mean(Ozone$ozone))^2);
+
+RMSE_wind = sqrt((1/length(Ozone$ozone)) * sum((Ozone$ozone - y_hat_wind)^2));
+RMSE_humidity = sqrt((1/length(Ozone$ozone)) * sum((Ozone$ozone - y_hat_humidity)^2));
+RMSE_temp = sqrt((1/length(Ozone$ozone)) * sum((Ozone$ozone - y_hat_temp)^2));
+
+R2_wind = SSReg_wind / SST;
+R2_humidity = SSReg_humidity / SST;
+R2_temp = SSReg_temp / SST;
+
+RMSEs = c("Wind" = RMSE_wind, "Humidity" = RMSE_humidity, "Temp" = RMSE_temp);
+R2s = c("Wind" = R2_wind, "Humidity" = R2_humidity, "Temp" = R2_temp);
+table = data.frame(RMSEs, R2s);
+
+library("knitr");
+library("kableExtra");
+
+kable(table);
+```
+
+**(b)** Based on the results, which of the three predictors used is most helpful for predicting ozone readings? Briefly explain.
+
+- **Temp appears to be the most helpful at predicting ozone readings as it has the highest explanatory power R2 and the lowest RMSE value.**
+
+***
+
+## Exercise 00 (SLR without Intercept)
+
+**This exercise will _not_ be graded and is simply provided for your information. No credit will be given for the completion of this exercise. Give it a try now, and be sure to read the solutions later.**
+
+Sometimes it can be reasonable to assume that $\beta_0$ should be 0. That is, the line should pass through the point $(0, 0)$. For example, if a car is traveling 0 miles per hour, its stopping distance should be 0! (Unlike what we saw in the book.)
+
+We can simply define a model without an intercept,
+
+\[
+Y_i = \beta x_i + \epsilon_i.
+\]
+
+**(a)** [In the **Least Squares Approach** section of the text](http://daviddalpiaz.github.io/appliedstats/simple-linear-regression.html#least-squares-approach) you saw the calculus behind the derivation of the regression estimates, and then we performed the calculation for the `cars` dataset using `R`. Here you need to do, but not show, the derivation for the slope only model. You should then use that derivation of $\hat{\beta}$ to write a function that performs the calculation for the estimate you derived. 
+
+In summary, use the method of least squares to derive an estimate for $\beta$ using data points $(x_i, y_i)$ for $i = 1, 2, \ldots n$. Simply put, find the value of $\beta$ to minimize the function
+
+\[
+f(\beta)=\sum_{i=1}^{n}(y_{i}-\beta x_{i})^{2}.
+\]
+
+Then, write a function `get_beta_no_int` that takes input:
+
+- `x` - A predictor variable
+- `y` - A response variable
+
+The function should then output the $\hat{\beta}$ you derived for a given set of data.
+
+**(b)** Write your derivation in your `.Rmd` file using TeX. Or write your derivation by hand, scan or photograph your work, and insert it into the `.Rmd` as an image. See the [RMarkdown documentation](http://rmarkdown.rstudio.com/) for working with images.
+
+**(c)** Test your function on the `cats` data using body weight as `x` and heart weight as `y`. What is the estimate for $\beta$ for this data?
+
+**(d)** Check your work in `R`. The following syntax can be used to fit a model without an intercept:
+
+```{r, eval = FALSE}
+lm(response ~ 0 + predictor, data = dataset)
+```
+
+Use this to fit a model to the `cat` data without an intercept. Output the coefficient of the fitted model. It should match your answer to **(c)**.
+
