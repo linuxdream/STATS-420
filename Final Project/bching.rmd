@@ -1,0 +1,185 @@
+---
+title: "bching3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("foreign");
+library("lmtest");
+library("knitr");
+
+
+calc_loocv_rmse = function(model) {
+  sqrt(mean((resid(model) / (1 - hatvalues(model))) ^ 2))
+}
+```
+
+```{r}
+school_data = read.dbf('api04bdb.dbf', as.is = TRUE);
+
+# Focus in on specific columns.
+school_data = school_data[, c(
+  'API04',
+  'ST_RANK',
+  #'VALID_NUM', 
+  'PCT_AA', 
+  #'AA_API', 
+  'PCT_AI', 
+  #'AI_API', 
+  'PCT_AS', 
+  #'AS_API', 
+  'PCT_FI', 
+  #'FI_API',
+  'PCT_HI', 
+  #'HI_API', 
+  'PCT_PI', 
+  #'PI_API', 
+  'PCT_WH', 
+  #'WH_API', 
+  'SD_NUM', 
+  #'SD_API', 
+  'MEALS', 
+  'EL', 
+  # 'YR_RND', 
+  'SMOB',
+  'NOT_HSG', 
+  'HSG', 
+  'SOME_COL', 
+  'COL_GRAD', 
+  'GRAD_SCH', 
+  'AVG_ED', 
+  'FULL', 
+  'EMER',
+  'DFC',
+  'ENROLL',
+  'PARENT_OPT',
+  'SCI',
+  'CBMOB'
+  )];
+
+
+int_fields = c(
+  'API04', 
+  'ST_RANK', 
+  #'VALID_NUM', 
+  'PCT_AA', 
+  #'AA_API', 
+  'PCT_AI', 
+  #'AI_API', 
+  'PCT_AS', 
+  #'AS_API', 
+  'PCT_FI', 
+  #'FI_API',
+  'PCT_HI', 
+  #'HI_API', 
+  'PCT_PI', 
+  #'PI_API', 
+  'PCT_WH', 
+  #'WH_API', 
+  'SD_NUM', 
+  #'SD_API', 
+  'MEALS', 
+  'EL', 
+  'SMOB',
+  'NOT_HSG', 
+  'HSG', 
+  'SOME_COL', 
+  'COL_GRAD', 
+  'GRAD_SCH', 
+  'AVG_ED', 
+  'FULL', 
+  'EMER',
+  'ENROLL',
+  'PARENT_OPT',
+  'SCI',
+  'CBMOB'
+  );
+
+# Convert factor fields
+school_data$DFC = as.factor(school_data$DFC);
+#school_data$SIM_RANK = as.factor(school_data$SIM_RANK);
+
+# Remove unknown charters and year round
+school_data = school_data[!(school_data$ST_RANK %in% c("I", "B", "C")), ]
+
+# Transform fields to proper types
+for ( i in 1:length(int_fields) ) {
+  school_data[, int_fields[i]] = as.numeric(school_data[, int_fields[i]]);
+}
+
+# Remove NAs
+school_data = na.omit(school_data);
+
+# Gather a training set
+train = sample(seq_len(nrow(school_data)), size = floor(nrow(school_data)*.75))
+
+# Split
+school_data_train = school_data[train,];
+school_data_test = school_data[-train,];
+
+# Full model - Do we need to train/split/test?
+school_model_full = lm(API04 ~ ., data = school_data);
+
+# Find the best models
+best_back_aic = step(school_model_full, direction = "backward", trace = FALSE);
+best_back_bic = step(school_model_full, direction = "backward", trace = FALSE, k = log(length(nrow(school_data))));
+
+best_forward_aic = step(lm(API04 ~ 1, data = school_data), direction = "forward", trace = FALSE, scope = formula(school_model_full));
+best_forward_bic = step(lm(API04 ~ 1, data = school_data), direction = "forward", trace = FALSE, k = log(length(nrow(school_data))), scope = formula(school_model_full));
+
+# Check R2 and LOOCV
+(r2 = c(
+  "Backward AIC" = summary(best_back_aic)$adj.r.squared,
+  "Backward BIC" = summary(best_back_bic)$adj.r.squared,
+  "Forward AIC" = summary(best_forward_aic)$adj.r.squared,
+  "Forward BIC" = summary(best_forward_bic)$adj.r.squared
+));
+
+(loocv = c(
+  "Backward AIC" = calc_loocv_rmse(best_back_aic),
+  "Backward BIC" = calc_loocv_rmse(best_back_bic),
+  "Forward AIC" = calc_loocv_rmse(best_forward_aic),
+  "Forward BIC" = calc_loocv_rmse(best_forward_bic)
+));
+
+r2[which.max(r2)];
+loocv[which.min(loocv)];
+
+# Set best model
+best_model = best_back_aic;
+
+#BP and Shapiro 
+bptest(best_model);
+shapiro.test(resid(best_model)[1:5000])
+
+# Check for influential points
+inf_points = cooks.distance(best_model) > 4 / length(cooks.distance(best_model))
+sum(inf_points)
+
+# Remove influential points
+school_data_clean = school_data[-which(inf_points),];
+
+best_model_clean = lm(formula(best_model), data = school_data_clean);
+
+# Test again...still no dice
+bptest(best_model_clean)
+shapiro.test(resid(best_model_clean)[1:5000]);
+
+# Plots
+qqnorm(resid(best_model_clean), col = "orange")
+qqline(resid(best_model_clean), col = "dodgerblue", lwd = 2)
+
+plot(fitted(best_model_clean),
+  resid(best_model_clean),
+  main = "Fitted vs Residuals",
+  xlab = "Fitted",
+  ylab = "Residuals",
+  col = "orange",
+  pch = 20
+);
+
+
+summary(best_model_clean)
+```
