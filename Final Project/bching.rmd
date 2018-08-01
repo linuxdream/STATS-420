@@ -188,41 +188,22 @@ summary(best_model_clean)
 round(cor(school_data_clean[, !(names(school_data_clean) %in% c("DFC"))]), 2)
 vif(best_model_clean)
 
-# Check for EL partial correlation coefficient
-small = lm(EL ~ PCT_AA + PCT_AI + PCT_AS + PCT_FI + PCT_HI + PCT_WH + 
-    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
-    DFC + ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
-
-cor(resid(small), resid(best_model_clean))
-# Super small so it has very little effect. Remove it
-
-
-# Removing EL has no effect
-best_model_clean_small = lm(API04 ~ PCT_AA + PCT_AI + PCT_AS + PCT_FI + PCT_HI + PCT_WH + 
-    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
-   ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
-
+# Removed some highly colinear columns and tested with anova. This seems to be
+# the best model.
 best_model_clean_small = lm(API04 ~ PCT_AA +  PCT_FI +  PCT_WH + 
     SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
    ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
 
-best_model_clean_small2 = lm(API04 ~ PCT_AA +  PCT_FI +  PCT_WH + 
-    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
-   ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
+bptest(best_model_clean_small)
+shapiro.test(resid(best_model_clean_small)[1:5000]);
 
-anova(best_model_clean_small2, best_model_clean_small)
+vif(best_model_clean_small)
+summary(best_model_clean_small)
 
-bptest(best_model_clean_small2)
-shapiro.test(resid(best_model_clean_small2)[1:5000]);
-
-vif(best_model_clean_small2)
-summary(best_model_clean_small2)
-
-
-qqnorm(resid(best_model_clean_small2), col = "orange")
-qqline(resid(best_model_clean_small2), col = "dodgerblue", lwd = 2)
-plot(fitted(best_model_clean_small2),
-  resid(best_model_clean_small2),
+qqnorm(resid(best_model_clean_small), col = "orange")
+qqline(resid(best_model_clean_small), col = "dodgerblue", lwd = 2)
+plot(fitted(best_model_clean_small),
+  resid(best_model_clean_small),
   main = "Fitted vs Residuals",
   xlab = "Fitted",
   ylab = "Residuals",
