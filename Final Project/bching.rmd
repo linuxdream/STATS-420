@@ -9,6 +9,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library("foreign");
 library("lmtest");
 library("knitr");
+library("faraway");
 
 
 calc_loocv_rmse = function(model) {
@@ -19,10 +20,9 @@ calc_loocv_rmse = function(model) {
 ```{r}
 school_data = read.dbf('api04bdb.dbf', as.is = TRUE);
 
-# Focus in on specific columns.
-school_data = school_data[, c(
+include_cols = c(
   'API04',
-  'ST_RANK',
+  #'ST_RANK',
   #'VALID_NUM', 
   'PCT_AA', 
   #'AA_API', 
@@ -57,12 +57,15 @@ school_data = school_data[, c(
   'PARENT_OPT',
   'SCI',
   'CBMOB'
-  )];
+  );
+
+# Focus in on specific columns.
+school_data = school_data[, include_cols];
 
 
 int_fields = c(
   'API04', 
-  'ST_RANK', 
+  #'ST_RANK', 
   #'VALID_NUM', 
   'PCT_AA', 
   #'AA_API', 
@@ -102,7 +105,7 @@ school_data$DFC = as.factor(school_data$DFC);
 #school_data$SIM_RANK = as.factor(school_data$SIM_RANK);
 
 # Remove unknown charters and year round
-school_data = school_data[!(school_data$ST_RANK %in% c("I", "B", "C")), ]
+#school_data = school_data[!(school_data$ST_RANK %in% c("I", "B", "C")), ]
 
 # Transform fields to proper types
 for ( i in 1:length(int_fields) ) {
@@ -116,8 +119,8 @@ school_data = na.omit(school_data);
 train = sample(seq_len(nrow(school_data)), size = floor(nrow(school_data)*.75))
 
 # Split
-school_data_train = school_data[train,];
-school_data_test = school_data[-train,];
+#school_data_train = school_data[train,];
+#school_data_test = school_data[-train,];
 
 # Full model - Do we need to train/split/test?
 school_model_full = lm(API04 ~ ., data = school_data);
@@ -180,6 +183,50 @@ plot(fitted(best_model_clean),
   pch = 20
 );
 
-
+formula(best_model_clean)
 summary(best_model_clean)
+round(cor(school_data_clean[, !(names(school_data_clean) %in% c("DFC"))]), 2)
+vif(best_model_clean)
+
+# Check for EL partial correlation coefficient
+small = lm(EL ~ PCT_AA + PCT_AI + PCT_AS + PCT_FI + PCT_HI + PCT_WH + 
+    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
+    DFC + ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
+
+cor(resid(small), resid(best_model_clean))
+# Super small so it has very little effect. Remove it
+
+
+# Removing EL has no effect
+best_model_clean_small = lm(API04 ~ PCT_AA + PCT_AI + PCT_AS + PCT_FI + PCT_HI + PCT_WH + 
+    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
+   ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
+
+best_model_clean_small = lm(API04 ~ PCT_AA +  PCT_FI +  PCT_WH + 
+    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
+   ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
+
+best_model_clean_small2 = lm(API04 ~ PCT_AA +  PCT_FI +  PCT_WH + 
+    SD_NUM + MEALS + EL + SMOB + NOT_HSG + SOME_COL + AVG_ED + 
+   ENROLL + PARENT_OPT + SCI + CBMOB, data = school_data_clean);
+
+anova(best_model_clean_small2, best_model_clean_small)
+
+bptest(best_model_clean_small2)
+shapiro.test(resid(best_model_clean_small2)[1:5000]);
+
+vif(best_model_clean_small2)
+summary(best_model_clean_small2)
+
+
+qqnorm(resid(best_model_clean_small2), col = "orange")
+qqline(resid(best_model_clean_small2), col = "dodgerblue", lwd = 2)
+plot(fitted(best_model_clean_small2),
+  resid(best_model_clean_small2),
+  main = "Fitted vs Residuals",
+  xlab = "Fitted",
+  ylab = "Residuals",
+  col = "orange",
+  pch = 20
+);
 ```
